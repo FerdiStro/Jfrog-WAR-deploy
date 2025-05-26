@@ -1,0 +1,6 @@
+[package]
+name = "Jfrog-WAR-deploy"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
