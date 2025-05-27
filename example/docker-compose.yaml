@@ -1,0 +1,15 @@
+version: "3.9"
+
+services:
+  rust-app:
+    image: imagewatcher
+    volumes:
+      - ./deploy:/app
+    working_dir: /app
+    environment:
+      INTERVAL: "5"
+      JFROG_REPRO: "staging/com/yourcomp/repro/"
+      JFROG_HOST: "https://yourcomp.jfrog.io"
+      WAR_NAME: "youtName-{%VERSION}.war"
+      JFROG_AUTH: "USER:TOKEN"
+
