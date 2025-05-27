@@ -1,4 +1,3 @@
-# 1. Build-Stage
 FROM rust:1.87.0 AS builder
 
 WORKDIR /usr/src/app
@@ -9,12 +8,9 @@ RUN cargo clean
 
 RUN cargo build --release
 
-
-
 FROM debian:trixie
 
-RUN apt-get update  && apt-get install -y ca-certificates
-
+RUN apt-get update  && apt-get install -y ca-certificates docker-cli docker-compose
 
 WORKDIR /usr/local/bin
 

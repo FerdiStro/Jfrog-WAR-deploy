@@ -12,28 +12,54 @@ use std::time::Duration;
 use tokio::fs::File as TokioFile;
 use tokio_util::io::StreamReader;
 use version_object::Version;
+use log::{info, warn, error, debug, trace};
+use terminal_banner::{Banner, Padding};
+
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("Starting...");
+    env_logger::init();
+
+
+
+    let banner = Banner::new()
+        .text("Jfrog-WAR-deploy".into())
+        .text("Git-Hub:      https://github.com/FerdiStro/Jfrog-WAR-deploy".into())
+        .text("Docker-Image: https://hub.docker.com/r/ferdinond/jfrog-artifact-watcher".into())
+        .divider()
+        .text("Docs:         https://github.com/FerdiStro/Jfrog-WAR-deploy/tree/main/doc".into())
+        .text("Example:      https://github.com/FerdiStro/Jfrog-WAR-deploy/tree/main/example".into())
+        .render();
+    println!("{}", banner);
+
+    log::info!("Start Jfrog-WAR-Watcher");
+
+
 
     const DEFAULT_INTERVAL: u64 = 5;
     let interval_secs: u64 = env::var("INTERVAL")
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(DEFAULT_INTERVAL);
+    debug!("Interval: {}", interval_secs);
 
     const DEFAULT_HOST: &str = "https://jfrog.io";
     let host = env::var("JFROG_HOST").unwrap_or_else(|_| DEFAULT_HOST.to_string());
+    debug!("JFROG_HOST: {}", host);
     
     let jfrog_repro_path  = env::var("JFROG_REPRO_PATH").expect("JFROG_REPRO_PATH not set");
+    debug!("JFROG_REPRO_PATH: {}", jfrog_repro_path);
+    
     
     let war_name = env::var("WAR_NAME").expect("WAR_NAME not set");
+    debug!("WAR_NAME: {}", war_name);
     
     let jfrog_url = format!("{}/artifactory/{}", host, jfrog_repro_path);
+    debug!("JFROG_URL: {}", jfrog_url);
     
     let auth_token =  env::var("JFROG_AUTH").expect("JFROG_AUTH not set");
-
+    debug!("JFROG_AUTH: -------", );
+    
     let mut last_version: Version = Version {
         major: 0,
         minor: 0,
@@ -41,22 +67,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     loop {
-        println!("Checking for new version...");
+        info!("Checking for new version");
+        
         let version = get_latest_version(jfrog_url.clone(), auth_token.clone()).await?;
-
+        debug!("Version: {}", version.to_string());
+        
         if (last_version.to_string() != *version.to_string()) {
-            println!("Latest version: {}", version.to_string());
+            info!("New Version found: {}", version.to_string());
 
             last_version = *version;
 
             let war_name = war_name.replace("{%VERSION}", &version.to_string());
+            debug!("WAR_NAME_CHANGED: {}", war_name);
 
             download_latest(*version, jfrog_url.clone(), auth_token.clone(), war_name)
                 .await
                 .expect("Download failed check JFROG");
+            debug!("Download successful");
             deploy_version(*version);
         } else {
-            println!(
+            info!(
                 "No new version found. Last version: {}",
                 last_version.to_string()
             );
@@ -77,6 +107,8 @@ async fn download_latest(
     let auth_header = format!("Basic {}", encoded);
 
     let download_url = format!("{}{}/{}", url, lts.to_string(), war_name);
+    
+    debug!("Download URL: {}", download_url);
 
     let response = client
         .get(download_url)
@@ -87,7 +119,7 @@ async fn download_latest(
     let status = response.status();
 
     if !status.is_success() {
-        eprintln!("Download failed with status: {}", status);
+        error!("Download failed with status: {}", status);
         return Err("Download failed".into());
     }
 
@@ -102,12 +134,13 @@ async fn download_latest(
     let mut file = TokioFile::create(output_file_name.clone()).await?;
     tokio::io::copy(&mut stream, &mut file).await?;
 
-    println!("File saved with name: {}", output_file_name);
+    info!("File saved with name: {}", output_file_name);
 
     Ok(())
 }
 
 fn deploy_version(version: Version) {
+    info!("Deploying version: {}. Execute script deploy.sh", version.to_string());
     Command::new("./deploy.sh")
         .env("ARTIFACTORY_VERSION", version.to_string())
         .spawn()
@@ -138,7 +171,7 @@ async fn get_latest_version(
         patch: 0,
     };
 
-    println!("Response status: {}", status);
+    debug!("Response status: {}", status);
 
     if status == 200 {
         let mut last_date: NaiveDateTime = NaiveDateTime::from_timestamp(0, 0);

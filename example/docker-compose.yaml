@@ -2,14 +2,22 @@ version: "3.9"
 
 services:
   rust-app:
-    image: imagewatcher
+    image: ferdinond/jfrog-artifact-watcher
     volumes:
       - ./deploy:/app
+#      if you want access to host machine data
+      - /usr/project/data/:/data
+#      use the same docker socket as the host machine
+      - /var/run/docker.sock:/var/run/docker.sock
     working_dir: /app
     environment:
+#      define LogLevel
+      RUST_LOG: info
       INTERVAL: "5"
       JFROG_REPRO: "staging/com/yourcomp/repro/"
       JFROG_HOST: "https://yourcomp.jfrog.io"
       WAR_NAME: "youtName-{%VERSION}.war"
       JFROG_AUTH: "USER:TOKEN"
-
+#      if your docker machine is proxied
+      http_proxy: http://internal-proxy:3242
+      https_proxy: http://internal-proxy:3242
