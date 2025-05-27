@@ -75,16 +75,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         if (last_version.to_string() != *version.to_string()) {
             info!("New Version found: {}", version.to_string());
 
-            last_version = *version;
 
             let war_name = war_name.replace("{%VERSION}", &version.to_string());
             debug!("WAR_NAME_CHANGED: {}", war_name);
-
-            download_latest(*version, jfrog_url.clone(), auth_token.clone(), war_name)
-                .await
-                .expect("Download failed check JFROG");
-            debug!("Download successful");
-            deploy_version(*version);
+            
+            match download_latest(*version, jfrog_url.clone(), auth_token.clone(), war_name).await {
+                Ok(_) => {
+                    deploy_version(*version);
+                    debug!("Download successful");
+                    last_version = *version;
+                }
+                Err(e) => {
+                    error!("Download failed: {e}");
+                    continue; 
+                }
+            }
+            
+            
         } else {
             info!(
                 "No new version found. Last version: {}",
@@ -145,6 +152,9 @@ fn deploy_version(version: Version) {
         .env("ARTIFACTORY_VERSION", version.to_string())
         .spawn()
         .expect("Failed to start deploy.sh");
+
+    info!("Deploying version: {}. Executed and finished script deploy.sh", version.to_string());
+
 }
 
 async fn get_latest_version(
